@@ -1,16 +1,7 @@
-import {
-  Bell,
-  ChevronDown,
-  LogOut,
-  Moon,
-  Search,
-  Sun,
-  User,
-} from "lucide-react";
+import { Bell, ChevronDown, LogOut, Moon, Sun } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
-import { notices } from "../../data/seedData";
 
 interface NavbarProps {
   isDark: boolean;
@@ -44,18 +35,8 @@ export function Navbar({ isDark, onToggleDark, pageTitle }: NavbarProps) {
   const { user, logout } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [searchVal, setSearchVal] = useState("");
 
   if (!user) return null;
-
-  const relevantNotices = notices
-    .filter(
-      (n) =>
-        n.targetRoles.includes(user.role) ||
-        user.role === "admin" ||
-        user.role === "principal",
-    )
-    .slice(0, 4);
 
   return (
     <header className="sticky top-0 z-30 bg-card/95 dark:bg-card/95 backdrop-blur-sm border-b border-border px-6 py-3 flex items-center gap-4">
@@ -66,49 +47,23 @@ export function Navbar({ isDark, onToggleDark, pageTitle }: NavbarProps) {
         </h1>
       </div>
 
-      {/* Search */}
-      <div className="flex-1 max-w-md ml-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            value={searchVal}
-            onChange={(e) => setSearchVal(e.target.value)}
-            placeholder="Search students, reports…"
-            className="w-full pl-9 pr-4 py-2 bg-muted rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 border border-transparent focus:border-primary/30 transition-all"
-            data-ocid="navbar.search_input"
-          />
-        </div>
-      </div>
-
       <div className="ml-auto flex items-center gap-2">
-        {/* College branding */}
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-accent rounded-lg">
-          <div
-            className="w-6 h-6 rounded-md flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-            style={{ background: user.college.themeColor }}
-          >
-            {user.college.shortName.slice(0, 2)}
-          </div>
-          <span className="text-xs font-medium text-accent-foreground truncate max-w-[140px]">
-            {user.college.name}
-          </span>
-        </div>
-
         {/* Dark mode toggle */}
         <button
           type="button"
           onClick={onToggleDark}
           className="p-2 rounded-lg hover:bg-muted transition-colors"
           data-ocid="navbar.dark_mode.toggle"
+          aria-label="Toggle dark mode"
         >
           {isDark ? (
-            <Sun className="w-4.5 h-4.5 text-muted-foreground" />
+            <Sun className="w-4 h-4 text-muted-foreground" />
           ) : (
-            <Moon className="w-4.5 h-4.5 text-muted-foreground" />
+            <Moon className="w-4 h-4 text-muted-foreground" />
           )}
         </button>
 
-        {/* Notifications */}
+        {/* Notifications bell (UI only) */}
         <div className="relative">
           <button
             type="button"
@@ -119,14 +74,13 @@ export function Navbar({ isDark, onToggleDark, pageTitle }: NavbarProps) {
             className="p-2 rounded-lg hover:bg-muted transition-colors relative"
             data-ocid="navbar.notifications.button"
           >
-            <Bell className="w-4.5 h-4.5 text-muted-foreground" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+            <Bell className="w-4 h-4 text-muted-foreground" />
           </button>
 
           <AnimatePresence>
             {notifOpen && (
               <motion.div
-                className="absolute right-0 top-full mt-2 w-80 bg-card rounded-xl shadow-card-md border border-border overflow-hidden"
+                className="absolute right-0 top-full mt-2 w-72 bg-card rounded-xl shadow-card-md border border-border overflow-hidden"
                 initial={{ opacity: 0, y: -8, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.96 }}
@@ -138,19 +92,11 @@ export function Navbar({ isDark, onToggleDark, pageTitle }: NavbarProps) {
                     Notifications
                   </p>
                 </div>
-                {relevantNotices.map((n) => (
-                  <div
-                    key={n.id}
-                    className="px-4 py-3 border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
-                  >
-                    <p className="text-sm font-medium text-foreground line-clamp-1">
-                      {n.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {n.date}
-                    </p>
-                  </div>
-                ))}
+                <div className="px-4 py-8 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    No new notifications
+                  </p>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -200,18 +146,22 @@ export function Navbar({ isDark, onToggleDark, pageTitle }: NavbarProps) {
                     {user.name}
                   </p>
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${roleBadgeColors[user.role]}`}
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${
+                      roleBadgeColors[user.role] ?? ""
+                    }`}
                   >
-                    {roleLabels[user.role]}
+                    {roleLabels[user.role] ?? user.role}
                   </span>
                 </div>
-                <div className="px-4 py-2 text-xs text-muted-foreground">
-                  <p>{user.college.name}</p>
-                </div>
+                {user.collegeId && user.collegeId !== "" && (
+                  <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border">
+                    <p>College ID: {user.collegeId}</p>
+                  </div>
+                )}
                 <div className="border-t border-border">
                   <button
                     type="button"
-                    onClick={logout}
+                    onClick={() => logout()}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-destructive hover:bg-destructive/5 transition-colors"
                     data-ocid="navbar.logout.button"
                   >

@@ -3,9 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { RegistrationProvider } from "./contexts/RegistrationContext";
 import { Login } from "./pages/Login";
-import { StudentRegistrationForm } from "./pages/StudentRegistrationForm";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { FeeManagerDashboard } from "./pages/feeManager/FeeManagerDashboard";
 import { PrincipalDashboard } from "./pages/principal/PrincipalDashboard";
@@ -57,21 +55,18 @@ const pageTitles: Record<string, Record<string, string>> = {
   superAdmin: {
     dashboard: "Platform Dashboard",
     colleges: "Colleges",
-    analytics: "Analytics",
-    subscriptions: "Subscriptions",
+    admins: "Administrators",
     settings: "Platform Settings",
-    global: "Global Reports",
   },
 };
 
 function AppContent() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading } = useAuth();
   const [isDark, setIsDark] = useState(() => {
     const stored = localStorage.getItem("erp_theme");
     if (stored) return stored === "dark";
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
-  const [showRegistration, setShowRegistration] = useState(false);
 
   useEffect(() => {
     if (isDark) {
@@ -82,24 +77,18 @@ function AppContent() {
     localStorage.setItem("erp_theme", isDark ? "dark" : "light");
   }, [isDark]);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading EduNest ERP…</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated || !user) {
-    if (showRegistration) {
-      return (
-        <AnimatePresence mode="wait">
-          <motion.div
-            key="registration"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <StudentRegistrationForm
-              onBack={() => setShowRegistration(false)}
-            />
-          </motion.div>
-        </AnimatePresence>
-      );
-    }
     return (
       <AnimatePresence mode="wait">
         <motion.div
@@ -109,7 +98,7 @@ function AppContent() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
         >
-          <Login onShowRegistration={() => setShowRegistration(true)} />
+          <Login />
         </motion.div>
       </AnimatePresence>
     );
@@ -139,7 +128,7 @@ function AppContent() {
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        key={user.id}
+        key={user.userId}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.2 }}
@@ -172,11 +161,9 @@ function AppContent() {
 
 export default function App() {
   return (
-    <RegistrationProvider>
-      <AuthProvider>
-        <AppContent />
-        <Toaster />
-      </AuthProvider>
-    </RegistrationProvider>
+    <AuthProvider>
+      <AppContent />
+      <Toaster />
+    </AuthProvider>
   );
 }

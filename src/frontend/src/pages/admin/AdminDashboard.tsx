@@ -1,32 +1,50 @@
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import {
-  AlertCircle,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
   Bell,
-  Building2,
-  CheckCircle,
   GraduationCap,
+  Loader2,
   Plus,
-  Settings,
+  RefreshCw,
   Shield,
   Users,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import type { College, Notice, User } from "../../backend";
+import { UserRole } from "../../backend";
+import { backendAPI as backend } from "../../backendAPI";
 import { useAuth } from "../../contexts/AuthContext";
-import { useRegistration } from "../../contexts/RegistrationContext";
-import {
-  departments,
-  notices,
-  students,
-  teachers,
-  users,
-} from "../../data/seedData";
 import { AdminStudents } from "./AdminStudents";
 
 const CARD = "bg-card rounded-2xl border border-border shadow-card p-5";
-const INPUT =
-  "w-full px-3.5 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all";
 
 function StatCard({
   icon: Icon,
@@ -60,367 +78,654 @@ function StatCard({
   );
 }
 
+// ── Add User Dialog ───────────────────────────────────────────────────────────
+function AddUserDialog({
+  role,
+  collegeId,
+  token,
+  onCreated,
+}: {
+  role: UserRole;
+  collegeId: string;
+  token: string;
+  onCreated: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    username: "",
+    email: "",
+    password: "",
+    phone: "",
+  });
+  const [loading, setLoading] = useState(false);
+
+  const roleLabel =
+    role === UserRole.teacher
+      ? "Teacher"
+      : role === UserRole.student
+        ? "Student"
+        : role === UserRole.feeManager
+          ? "Fee Manager"
+          : role === UserRole.principal
+            ? "Principal"
+            : "User";
+
+  const handleSubmit = async () => {
+    if (!form.name || !form.username || !form.password) {
+      toast.error("Name, username and password are required.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await backend.createUser(
+        token,
+        form.username,
+        form.email,
+        form.password,
+        role,
+        collegeId,
+        form.name,
+        form.phone,
+      );
+      toast.success(`${roleLabel} "${form.name}" created!`);
+      setForm({ name: "", username: "", email: "", password: "", phone: "" });
+      setOpen(false);
+      onCreated();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to create user");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" data-ocid={`admin.${role}.open_modal_button`}>
+          <Plus className="w-4 h-4 mr-1" /> Add {roleLabel}
+        </Button>
+      </DialogTrigger>
+      <DialogContent data-ocid={`admin.${role}.dialog`}>
+        <DialogHeader>
+          <DialogTitle>Add {roleLabel}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Full Name *</Label>
+              <Input
+                placeholder="Full name"
+                value={form.name}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, name: e.target.value }))
+                }
+                data-ocid={`admin.${role}.name.input`}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Username *</Label>
+              <Input
+                placeholder="Login username"
+                value={form.username}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, username: e.target.value }))
+                }
+                data-ocid={`admin.${role}.username.input`}
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Email</Label>
+            <Input
+              type="email"
+              placeholder="email@college.edu"
+              value={form.email}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, email: e.target.value }))
+              }
+              data-ocid={`admin.${role}.email.input`}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Password *</Label>
+              <Input
+                type="password"
+                placeholder="Set password"
+                value={form.password}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, password: e.target.value }))
+                }
+                data-ocid={`admin.${role}.password.input`}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Phone</Label>
+              <Input
+                placeholder="Phone number"
+                value={form.phone}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, phone: e.target.value }))
+                }
+                data-ocid={`admin.${role}.phone.input`}
+              />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setOpen(false)}
+            data-ocid={`admin.${role}.cancel_button`}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={loading}
+            data-ocid={`admin.${role}.submit_button`}
+          >
+            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Create {roleLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Reset Password Dialog ───────────────────────────────────────────────────
+function ResetPasswordDialog({
+  user: targetUser,
+  token,
+}: { user: User; token: string }) {
+  const [open, setOpen] = useState(false);
+  const [newPwd, setNewPwd] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleReset = async () => {
+    if (!newPwd) return;
+    setLoading(true);
+    try {
+      await backend.resetPassword(token, targetUser.id, newPwd);
+      toast.success(`Password reset for ${targetUser.name}`);
+      setNewPwd("");
+      setOpen(false);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to reset");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          data-ocid="admin.users.reset_password.button"
+        >
+          Reset Pwd
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Reset Password</DialogTitle>
+        </DialogHeader>
+        <div className="py-2 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Set a new password for <strong>{targetUser.name}</strong>
+          </p>
+          <Input
+            type="password"
+            placeholder="New password"
+            value={newPwd}
+            onChange={(e) => setNewPwd(e.target.value)}
+            data-ocid="admin.users.new_password.input"
+          />
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setOpen(false)}
+            data-ocid="admin.users.reset_cancel_button"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleReset}
+            disabled={loading || !newPwd}
+            data-ocid="admin.users.reset_confirm_button"
+          >
+            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Reset
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Users Tab by Role ────────────────────────────────────────────────────────────
+function RoleUsersTab({
+  role,
+  collegeId,
+  token,
+}: { role: UserRole; collegeId: string; token: string }) {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await backend.listUsers(token, collegeId, role);
+      setUsers(data);
+    } catch {
+      toast.error("Failed to load users");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, collegeId, role]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const roleLabel =
+    role === UserRole.teacher
+      ? "Teacher"
+      : role === UserRole.student
+        ? "Student"
+        : role === UserRole.feeManager
+          ? "Fee Manager"
+          : role === UserRole.principal
+            ? "Principal"
+            : "User";
+
+  const toggleActive = async (u: User) => {
+    try {
+      await backend.updateUser(
+        token,
+        u.id,
+        u.name,
+        u.email,
+        u.phone,
+        !u.isActive,
+      );
+      setUsers((prev) =>
+        prev.map((x) => (x.id === u.id ? { ...x, isActive: !x.isActive } : x)),
+      );
+      toast.success(`User ${!u.isActive ? "activated" : "deactivated"}`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to update");
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {users.length} {roleLabel.toLowerCase()}(s)
+        </p>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchUsers}
+            data-ocid={`admin.${role}.refresh.button`}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+          <AddUserDialog
+            role={role}
+            collegeId={collegeId}
+            token={token}
+            onCreated={fetchUsers}
+          />
+        </div>
+      </div>
+
+      <div className={CARD}>
+        {loading ? (
+          <div
+            className="flex items-center justify-center py-10"
+            data-ocid={`admin.${role}.loading_state`}
+          >
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : users.length === 0 ? (
+          <div
+            className="text-center py-10"
+            data-ocid={`admin.${role}.empty_state`}
+          >
+            <Users className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+            <p className="font-medium text-foreground">
+              No {roleLabel.toLowerCase()}s yet
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Add your first {roleLabel.toLowerCase()} to get started.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Username</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((u, i) => (
+                  <TableRow key={u.id} data-ocid={`admin.${role}.row.${i + 1}`}>
+                    <TableCell className="font-medium">{u.name}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {u.username}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {u.email || "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {u.phone || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={`border-0 text-xs ${
+                          u.isActive
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {u.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <ResetPasswordDialog user={u} token={token} />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleActive(u)}
+                          data-ocid={`admin.${role}.toggle.${i + 1}`}
+                        >
+                          {u.isActive ? "Deactivate" : "Activate"}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Notices Section ───────────────────────────────────────────────────────────────
+function NoticesSection({
+  collegeId,
+  token,
+}: { collegeId: string; token: string }) {
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [targetRole, setTargetRole] = useState("all");
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchNotices = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await backend.listNotices(token, collegeId);
+      setNotices(data);
+    } catch {
+      toast.error("Failed to load notices");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, collegeId]);
+
+  useEffect(() => {
+    fetchNotices();
+  }, [fetchNotices]);
+
+  const handlePost = async () => {
+    if (!title.trim() || !content.trim()) {
+      toast.error("Title and content are required");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await backend.createNotice(token, collegeId, title, content, targetRole);
+      toast.success("Notice posted!");
+      setTitle("");
+      setContent("");
+      fetchNotices();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to post notice");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const INPUT =
+    "w-full px-3.5 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all";
+
+  return (
+    <div className="space-y-5">
+      <div className={CARD}>
+        <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+          <Plus className="w-4 h-4 text-primary" /> Post New Notice
+        </h3>
+        <div className="space-y-3">
+          <input
+            className={INPUT}
+            placeholder="Notice title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            data-ocid="admin.notices.title.input"
+          />
+          <textarea
+            className={`${INPUT} min-h-[90px] resize-y`}
+            placeholder="Notice content..."
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            data-ocid="admin.notices.content.textarea"
+          />
+          <div className="flex items-center gap-3">
+            <Label className="text-sm">Target:</Label>
+            <Select value={targetRole} onValueChange={setTargetRole}>
+              <SelectTrigger
+                className="w-40"
+                data-ocid="admin.notices.target.select"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="student">Students</SelectItem>
+                <SelectItem value="teacher">Teachers</SelectItem>
+                <SelectItem value="feeManager">Fee Manager</SelectItem>
+                <SelectItem value="principal">Principal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={handlePost}
+            disabled={submitting || !title || !content}
+            className="w-full"
+            data-ocid="admin.notices.submit_button"
+          >
+            {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Post Notice
+          </Button>
+        </div>
+      </div>
+
+      <div className={CARD}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-foreground">All Notices</h3>
+          <Button variant="outline" size="sm" onClick={fetchNotices}>
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+        {loading ? (
+          <div
+            className="flex items-center justify-center py-8"
+            data-ocid="admin.notices.loading_state"
+          >
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : notices.length === 0 ? (
+          <div
+            className="text-center py-8"
+            data-ocid="admin.notices.empty_state"
+          >
+            <Bell className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">No notices yet.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {notices.map((n, i) => (
+              <div
+                key={n.id}
+                className="py-3 border-b border-border last:border-0"
+                data-ocid={`admin.notices.item.${i + 1}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-foreground truncate">
+                      {n.title}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                      {n.content}
+                    </p>
+                  </div>
+                  <Badge className="border-0 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-xs flex-shrink-0">
+                    {n.targetRole}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Dashboard ──────────────────────────────────────────────────────────
 export function AdminDashboard({ section }: { section: string }) {
   const { user } = useAuth();
-  const { selfRegistrationEnabled, toggleSelfRegistration, registrations } =
-    useRegistration();
-  const [saved, setSaved] = useState<string | null>(null);
-  const [newUser, setNewUser] = useState({
-    name: "",
-    email: "",
-    role: "student",
-    department: "",
+  const token = user?.token ?? "";
+  const collegeId = user?.collegeId ?? "";
+
+  const [college, setCollege] = useState<College | null>(null);
+  const [userCounts, setUserCounts] = useState({
+    students: 0,
+    teachers: 0,
+    feeManagers: 0,
+    principals: 0,
   });
-  const [resetSearch, setResetSearch] = useState("");
-  const [pinned, setPinned] = useState<Record<string, boolean>>(
-    Object.fromEntries(notices.map((n) => [n.id, n.pinned])),
-  );
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [loadingStats, setLoadingStats] = useState(false);
 
-  const showSaved = (key: string) => {
-    setSaved(key);
-    setTimeout(() => setSaved(null), 2500);
-  };
+  const fetchStats = useCallback(async () => {
+    if (!token || !collegeId) return;
+    setLoadingStats(true);
+    try {
+      const [col, studs, tchs, fms, prins, nts] = await Promise.all([
+        backend.getCollege(token, collegeId).catch(() => null),
+        backend.listUsers(token, collegeId, UserRole.student).catch(() => []),
+        backend.listUsers(token, collegeId, UserRole.teacher).catch(() => []),
+        backend
+          .listUsers(token, collegeId, UserRole.feeManager)
+          .catch(() => []),
+        backend.listUsers(token, collegeId, UserRole.principal).catch(() => []),
+        backend.listNotices(token, collegeId).catch(() => []),
+      ]);
+      setCollege(col);
+      setUserCounts({
+        students: studs.length,
+        teachers: tchs.length,
+        feeManagers: fms.length,
+        principals: prins.length,
+      });
+      setNotices(nts);
+    } finally {
+      setLoadingStats(false);
+    }
+  }, [token, collegeId]);
 
-  const roleColors: Record<string, string> = {
-    student: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-    teacher:
-      "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-    feeManager: "bg-yellow-100 text-yellow-700",
-    principal: "bg-purple-100 text-purple-700",
-    admin: "bg-orange-100 text-orange-700",
-    superAdmin: "bg-red-100 text-red-700",
-  };
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   if (section === "students") {
-    return <AdminStudents />;
+    return <AdminStudents collegeId={collegeId} token={token} />;
   }
 
   if (section === "users") {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-5">
         <h2 className="text-xl font-bold text-foreground">User Management</h2>
-
-        <div className={CARD}>
-          <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-            <Plus className="w-4 h-4 text-primary" /> Add New User
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <span className="block text-xs font-medium text-muted-foreground mb-1.5">
-                Full Name
-              </span>
-              <input
-                className={INPUT}
-                placeholder="Enter full name"
-                value={newUser.name}
-                onChange={(e) =>
-                  setNewUser((p) => ({ ...p, name: e.target.value }))
-                }
-                data-ocid="admin.user.input"
-              />
-            </div>
-            <div>
-              <span className="block text-xs font-medium text-muted-foreground mb-1.5">
-                Email
-              </span>
-              <input
-                className={INPUT}
-                type="email"
-                placeholder="email@aits.edu"
-              />
-            </div>
-            <div>
-              <span className="block text-xs font-medium text-muted-foreground mb-1.5">
-                Role
-              </span>
-              <select
-                className={INPUT}
-                value={newUser.role}
-                onChange={(e) =>
-                  setNewUser((p) => ({ ...p, role: e.target.value }))
-                }
-                data-ocid="admin.user.select"
-              >
-                {["student", "teacher", "feeManager", "principal", "admin"].map(
-                  (r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ),
-                )}
-              </select>
-            </div>
-            <div>
-              <span className="block text-xs font-medium text-muted-foreground mb-1.5">
-                Department
-              </span>
-              <select className={INPUT}>
-                <option>Select department</option>
-                {departments.map((d) => (
-                  <option key={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => showSaved("user")}
-            className="mt-4 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
-            data-ocid="admin.user.submit_button"
-          >
-            {saved === "user" ? (
-              <span className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" /> User Created!
-              </span>
-            ) : (
-              "Create User"
-            )}
-          </button>
-        </div>
-
-        <div className={CARD}>
-          <h3 className="font-semibold text-foreground mb-4">All Users</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  {["Name", "Email/Mobile", "Role", "Department", "Status"].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        className="text-left py-2 pr-4 text-muted-foreground font-medium"
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  ...users,
-                  ...teachers.slice(0, 5).map((t) => ({
-                    id: t.id,
-                    name: t.name,
-                    role: "teacher" as const,
-                    email: t.email,
-                    collegeId: t.collegeId,
-                    password: "",
-                    department: t.department,
-                  })),
-                ]
-                  .slice(0, 12)
-                  .map((u, i) => (
-                    <tr
-                      key={u.id}
-                      className="border-b border-border last:border-0"
-                      data-ocid={`admin.users.row.${i + 1}`}
-                    >
-                      <td className="py-2.5 pr-4 font-medium text-foreground">
-                        {u.name}
-                      </td>
-                      <td className="py-2.5 pr-4 text-muted-foreground text-xs">
-                        {u.email ?? (u as { mobile?: string }).mobile ?? "-"}
-                      </td>
-                      <td className="py-2.5 pr-4">
-                        <Badge
-                          className={`border-0 text-xs ${roleColors[u.role] ?? ""}`}
-                        >
-                          {u.role}
-                        </Badge>
-                      </td>
-                      <td className="py-2.5 pr-4 text-muted-foreground">
-                        {u.department ?? "-"}
-                      </td>
-                      <td className="py-2.5">
-                        <span className="text-xs font-medium text-green-600">
-                          Active
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (section === "departments") {
-    return (
-      <div className="p-6 space-y-6">
-        <h2 className="text-xl font-bold text-foreground">
-          Department Management
-        </h2>
-        <div className={CARD}>
-          <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-            <Plus className="w-4 h-4 text-primary" /> Add Department
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <input
-              className={INPUT}
-              placeholder="Department Name"
-              data-ocid="admin.department.input"
+        <Tabs defaultValue="teachers">
+          <TabsList data-ocid="admin.users.tab">
+            <TabsTrigger value="teachers" data-ocid="admin.users.teachers.tab">
+              Teachers
+            </TabsTrigger>
+            <TabsTrigger
+              value="feeManagers"
+              data-ocid="admin.users.feemanagers.tab"
+            >
+              Fee Managers
+            </TabsTrigger>
+            <TabsTrigger
+              value="principals"
+              data-ocid="admin.users.principals.tab"
+            >
+              Principals
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="teachers" className="mt-5">
+            <RoleUsersTab
+              role={UserRole.teacher}
+              collegeId={collegeId}
+              token={token}
             />
-            <input className={INPUT} placeholder="Short Name (e.g. CSE)" />
-          </div>
-          <button
-            type="button"
-            onClick={() => showSaved("dept")}
-            className="mt-4 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
-            data-ocid="admin.department.submit_button"
-          >
-            {saved === "dept" ? "Department Added!" : "Add Department"}
-          </button>
-        </div>
-        <div className={CARD}>
-          <div className="space-y-3">
-            {departments.map((d, i) => (
-              <div
-                key={d.id}
-                className="flex items-center justify-between py-3 border-b border-border last:border-0"
-                data-ocid={`admin.departments.item.${i + 1}`}
-              >
-                <div>
-                  <p className="font-medium text-foreground">{d.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {d.studentCount} students • {d.teacherCount} teachers
-                  </p>
-                </div>
-                <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-0">
-                  {d.shortName}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        </div>
+          </TabsContent>
+          <TabsContent value="feeManagers" className="mt-5">
+            <RoleUsersTab
+              role={UserRole.feeManager}
+              collegeId={collegeId}
+              token={token}
+            />
+          </TabsContent>
+          <TabsContent value="principals" className="mt-5">
+            <RoleUsersTab
+              role={UserRole.principal}
+              collegeId={collegeId}
+              token={token}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     );
   }
 
   if (section === "notices") {
     return (
-      <div className="p-6 space-y-4">
-        <h2 className="text-xl font-bold text-foreground">Notice Management</h2>
-        {notices.map((n, i) => (
-          <div
-            key={n.id}
-            className={CARD}
-            data-ocid={`admin.notices.item.${i + 1}`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-semibold text-foreground">{n.title}</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {n.content.slice(0, 100)}...
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {n.author} • {n.date}
-                </p>
-              </div>
-              <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setPinned((p) => ({ ...p, [n.id]: !p[n.id] }))}
-                  className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
-                    pinned[n.id]
-                      ? "bg-red-100 text-red-700"
-                      : "bg-muted text-muted-foreground hover:bg-red-100 hover:text-red-700"
-                  }`}
-                  data-ocid={`admin.notices.pin.${i + 1}`}
-                >
-                  {pinned[n.id] ? "Pinned" : "Pin"}
-                </button>
-                <button
-                  type="button"
-                  className="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
-                  data-ocid={`admin.notices.delete_button.${i + 1}`}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (section === "settings") {
-    return (
-      <div className="p-6 max-w-2xl mx-auto space-y-6">
-        <h2 className="text-xl font-bold text-foreground">System Settings</h2>
-        <div className={CARD}>
-          <div className="flex items-center gap-2 mb-5 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-xl">
-            <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
-            <span className="text-sm text-yellow-700 dark:text-yellow-400">
-              Demo Mode — settings changes are simulated
-            </span>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <span className="block text-sm font-medium text-foreground mb-1.5">
-                College Name
-              </span>
-              <input
-                className={INPUT}
-                defaultValue={user?.college?.name}
-                data-ocid="admin.settings.input"
-              />
-            </div>
-            <div>
-              <span className="block text-sm font-medium text-foreground mb-1.5">
-                Contact Email
-              </span>
-              <input
-                className={INPUT}
-                defaultValue="info@aits.edu.in"
-                type="email"
-              />
-            </div>
-            <div>
-              <span className="block text-sm font-medium text-foreground mb-1.5">
-                Phone
-              </span>
-              <input className={INPUT} defaultValue="+91 294 2450123" />
-            </div>
-            <div>
-              <span className="block text-sm font-medium text-foreground mb-1.5">
-                Website
-              </span>
-              <input className={INPUT} defaultValue="www.aits.edu.in" />
-            </div>
-
-            {/* Student Self-Registration Toggle */}
-            <div className="flex items-center justify-between px-4 py-4 bg-muted rounded-xl border border-border">
-              <div>
-                <p className="text-sm font-semibold text-foreground">
-                  Allow Student Self Registration
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  When enabled, a registration link appears on the login page
-                </p>
-              </div>
-              <Switch
-                checked={selfRegistrationEnabled}
-                onCheckedChange={toggleSelfRegistration}
-                data-ocid="admin.settings.registration.switch"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => showSaved("settings")}
-              className="w-full py-2.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
-              data-ocid="admin.settings.save_button"
-            >
-              {saved === "settings"
-                ? "Settings Saved! (Demo)"
-                : "Save Settings"}
-            </button>
-          </div>
-        </div>
+      <div className="p-6 space-y-5">
+        <h2 className="text-xl font-bold text-foreground">Notices</h2>
+        <NoticesSection collegeId={collegeId} token={token} />
       </div>
     );
   }
@@ -428,72 +733,89 @@ export function AdminDashboard({ section }: { section: string }) {
   if (section === "security") {
     return (
       <div className="p-6 max-w-2xl mx-auto space-y-6">
-        <h2 className="text-xl font-bold text-foreground">Password Reset</h2>
+        <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+          <Shield className="w-5 h-5 text-primary" /> Password Reset
+        </h2>
         <div className={CARD}>
-          <div className="flex items-center gap-2 mb-5 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-xl">
-            <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
-            <span className="text-sm text-yellow-700 dark:text-yellow-400">
-              Demo Mode — password reset is simulated
-            </span>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <span className="block text-sm font-medium text-foreground mb-1.5">
-                Search User
-              </span>
-              <input
-                className={INPUT}
-                placeholder="Search by name or email"
-                value={resetSearch}
-                onChange={(e) => setResetSearch(e.target.value)}
-                data-ocid="admin.security.search_input"
+          <p className="text-sm text-muted-foreground mb-4">
+            Use the User Management section to reset passwords for individual
+            users.
+          </p>
+          <Tabs defaultValue="teachers">
+            <TabsList>
+              <TabsTrigger value="teachers">Teachers</TabsTrigger>
+              <TabsTrigger value="feeManagers">Fee Managers</TabsTrigger>
+              <TabsTrigger value="students">Students</TabsTrigger>
+            </TabsList>
+            <TabsContent value="teachers" className="mt-5">
+              <RoleUsersTab
+                role={UserRole.teacher}
+                collegeId={collegeId}
+                token={token}
               />
-            </div>
-            {resetSearch && (
-              <div className="space-y-2">
-                {[...users, ...teachers]
-                  .filter((u) =>
-                    u.name.toLowerCase().includes(resetSearch.toLowerCase()),
-                  )
-                  .slice(0, 3)
-                  .map((u) => (
-                    <div
-                      key={u.id}
-                      className="flex items-center justify-between px-4 py-3 bg-muted rounded-xl"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          {u.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {u.email ?? ""}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => showSaved(`reset-${u.id}`)}
-                        className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium"
-                        data-ocid="admin.security.submit_button"
-                      >
-                        {saved === `reset-${u.id}`
-                          ? "Reset!"
-                          : "Reset Password"}
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
+            </TabsContent>
+            <TabsContent value="feeManagers" className="mt-5">
+              <RoleUsersTab
+                role={UserRole.feeManager}
+                collegeId={collegeId}
+                token={token}
+              />
+            </TabsContent>
+            <TabsContent value="students" className="mt-5">
+              <RoleUsersTab
+                role={UserRole.student}
+                collegeId={collegeId}
+                token={token}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     );
   }
 
-  // Dashboard
-  const pendingCount = registrations.filter(
-    (r) => r.status === "pending",
-  ).length;
+  if (section === "settings") {
+    return (
+      <div className="p-6 max-w-2xl mx-auto space-y-6">
+        <h2 className="text-xl font-bold text-foreground">Settings</h2>
+        <div className={CARD}>
+          <p className="text-sm text-muted-foreground">
+            College ID: <strong>{collegeId}</strong>
+          </p>
+          {college && (
+            <div className="mt-4 space-y-2">
+              <p className="text-sm">
+                <span className="text-muted-foreground">Name:</span>{" "}
+                <strong>{college.name}</strong>
+              </p>
+              <p className="text-sm">
+                <span className="text-muted-foreground">Code:</span>{" "}
+                <strong>{college.code}</strong>
+              </p>
+              <p className="text-sm">
+                <span className="text-muted-foreground">Address:</span>{" "}
+                <strong>{college.address || "—"}</strong>
+              </p>
+              <p className="text-sm">
+                <span className="text-muted-foreground">Status:</span>{" "}
+                <Badge
+                  className={`border-0 text-xs ${
+                    college.status === "active"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-red-100 text-red-700"
+                  }`}
+                >
+                  {college.status}
+                </Badge>
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
+  // Dashboard home
   return (
     <div className="p-6 space-y-6">
       <motion.div
@@ -502,139 +824,121 @@ export function AdminDashboard({ section }: { section: string }) {
       >
         <h2 className="text-xl font-bold text-foreground">Admin Dashboard</h2>
         <p className="text-muted-foreground text-sm mt-1">
-          {user?.college?.name}
+          {college?.name ?? "Your College"}
         </p>
       </motion.div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          icon={Users}
-          value={String(students.length + teachers.length + 3)}
-          label="Total Users"
+          icon={GraduationCap}
+          value={String(userCounts.students)}
+          label="Students"
           color="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
         />
         <StatCard
-          icon={GraduationCap}
-          value={String(students.length)}
-          label="Students"
-          color="bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+          icon={Users}
+          value={String(userCounts.teachers)}
+          label="Teachers"
+          color="bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
         />
         <StatCard
           icon={Bell}
           value={String(notices.length)}
-          label="Active Notices"
+          label="Notices"
           color="bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400"
         />
         <StatCard
-          icon={Settings}
-          value="v2.1"
-          label="System Version"
+          icon={Shield}
+          value={String(userCounts.principals)}
+          label="Principals"
           color="bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
         />
       </div>
 
-      {pendingCount > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 px-4 py-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-xl"
-          data-ocid="admin.dashboard.pending_state"
+      {loadingStats && (
+        <div
+          className="flex items-center justify-center py-8"
+          data-ocid="admin.dashboard.loading_state"
         >
-          <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
-          <p className="text-sm text-yellow-700 dark:text-yellow-400">
-            <strong>
-              {pendingCount} student registration{pendingCount > 1 ? "s" : ""}
-            </strong>{" "}
-            awaiting approval.
-          </p>
-          <span className="ml-auto text-xs text-yellow-600 font-medium cursor-pointer hover:underline">
-            View →
-          </span>
-        </motion.div>
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className={CARD}>
-          <h3 className="font-semibold text-foreground mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              {
-                label: "Manage Students",
-                icon: GraduationCap,
-                key: "students",
-                color:
-                  "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400",
-              },
-              {
-                label: "Add User",
-                icon: Users,
-                key: "users",
-                color:
-                  "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
-              },
-              {
-                label: "Add Department",
-                icon: Building2,
-                key: "departments",
-                color: "bg-green-100 text-green-600",
-              },
-              {
-                label: "Post Notice",
-                icon: Bell,
-                key: "notices",
-                color: "bg-yellow-100 text-yellow-600",
-              },
-              {
-                label: "Reset Password",
-                icon: Shield,
-                key: "security",
-                color: "bg-purple-100 text-purple-600",
-              },
-            ].map((qa) => (
-              <button
-                type="button"
-                key={qa.key}
-                className="flex items-center gap-3 p-4 rounded-xl bg-muted hover:bg-muted/80 transition-colors text-left"
-                data-ocid={`admin.dashboard.${qa.key}.button`}
-              >
+          <h3 className="font-semibold text-foreground mb-4">Recent Notices</h3>
+          {notices.length === 0 ? (
+            <div
+              className="text-center py-6"
+              data-ocid="admin.dashboard.notices.empty_state"
+            >
+              <p className="text-sm text-muted-foreground">No notices yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {notices.slice(0, 5).map((n, i) => (
                 <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${qa.color}`}
+                  key={n.id}
+                  className="py-2 border-b border-border last:border-0"
+                  data-ocid={`admin.dashboard.notices.item.${i + 1}`}
                 >
-                  <qa.icon className="w-4 h-4" />
+                  <p className="text-sm font-medium text-foreground">
+                    {n.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                    {n.content}
+                  </p>
                 </div>
-                <span className="text-sm font-medium text-foreground">
-                  {qa.label}
-                </span>
-              </button>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className={CARD}>
-          <h3 className="font-semibold text-foreground mb-4">Recent Notices</h3>
-          <div className="space-y-3">
-            {notices.slice(0, 4).map((n, i) => (
-              <div
-                key={n.id}
-                className="flex items-start justify-between gap-3 py-2 border-b border-border last:border-0"
-                data-ocid={`admin.dashboard.notices.item.${i + 1}`}
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {n.title}
+          <h3 className="font-semibold text-foreground mb-4">College Info</h3>
+          {college ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-bold text-sm">
+                    {college.code.slice(0, 2)}
+                  </span>
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">
+                    {college.name}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {n.author} • {n.date}
+                    {college.address}
                   </p>
                 </div>
-                {n.pinned && (
-                  <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full flex-shrink-0">
-                    Pinned
-                  </span>
-                )}
               </div>
-            ))}
-          </div>
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Code</p>
+                  <p className="font-medium text-foreground">{college.code}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <Badge
+                    className={`border-0 text-xs ${
+                      college.status === "active"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {college.status}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <p className="text-sm text-muted-foreground">
+                Loading college info…
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

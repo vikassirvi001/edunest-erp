@@ -2,15 +2,12 @@ import {
   BarChart2,
   Bell,
   BookOpen,
-  BriefcaseBusiness,
   Building2,
   Calendar,
   ChevronRight,
   ClipboardList,
-  Database,
   DollarSign,
   FileText,
-  Globe,
   GraduationCap,
   LayoutDashboard,
   Menu,
@@ -22,23 +19,22 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
+import type { UserRole } from "../../backend";
 import { useAuth } from "../../contexts/AuthContext";
-import type { UserRole } from "../../data/seedData";
 
 interface NavItem {
   id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  badge?: number;
 }
 
 const navConfig: Record<UserRole, NavItem[]> = {
   student: [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "attendance", label: "Attendance", icon: UserCheck },
-    { id: "assignments", label: "Assignments", icon: ClipboardList, badge: 2 },
+    { id: "assignments", label: "Assignments", icon: ClipboardList },
     { id: "fees", label: "Fee Details", icon: DollarSign },
-    { id: "notices", label: "Notices", icon: Bell, badge: 3 },
+    { id: "notices", label: "Notices", icon: Bell },
     { id: "exams", label: "Exam Schedule", icon: Calendar },
     { id: "documents", label: "Documents", icon: FileText },
   ],
@@ -52,15 +48,13 @@ const navConfig: Record<UserRole, NavItem[]> = {
   ],
   feeManager: [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "records", label: "Fee Records", icon: Database },
+    { id: "records", label: "Fee Records", icon: DollarSign },
     { id: "payments", label: "Add Payment", icon: DollarSign },
-    { id: "reports", label: "Reports", icon: BarChart2 },
   ],
   principal: [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "students", label: "Students Overview", icon: GraduationCap },
     { id: "teachers", label: "Teacher Activities", icon: Users },
-    { id: "attendance", label: "Attendance Analytics", icon: BarChart2 },
     { id: "fees", label: "Fee Reports", icon: DollarSign },
     { id: "notices", label: "Notice Board", icon: Bell },
   ],
@@ -68,18 +62,15 @@ const navConfig: Record<UserRole, NavItem[]> = {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "students", label: "Students", icon: GraduationCap },
     { id: "users", label: "User Management", icon: Users },
-    { id: "departments", label: "Departments", icon: Building2 },
     { id: "notices", label: "Notices", icon: Bell },
-    { id: "settings", label: "System Settings", icon: Settings },
     { id: "security", label: "Password Reset", icon: Shield },
+    { id: "settings", label: "Settings", icon: Settings },
   ],
   superAdmin: [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "colleges", label: "Colleges", icon: Building2 },
-    { id: "analytics", label: "Analytics", icon: BarChart2 },
-    { id: "subscriptions", label: "Subscriptions", icon: BriefcaseBusiness },
+    { id: "admins", label: "Administrators", icon: Users },
     { id: "settings", label: "Platform Settings", icon: Settings },
-    { id: "global", label: "Global Reports", icon: Globe },
   ],
 };
 
@@ -111,8 +102,12 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
           <p className="text-white font-bold text-sm leading-tight truncate">
             EduNest ERP
           </p>
-          <p className="text-white/50 text-xs truncate">
-            {user.college.shortName}
+          <p className="text-white/50 text-xs truncate capitalize">
+            {user.role === "superAdmin"
+              ? "Super Admin"
+              : user.role === "feeManager"
+                ? "Fee Manager"
+                : user.role}
           </p>
         </div>
       </div>
@@ -139,14 +134,13 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
               data-ocid={`sidebar.${item.id}.link`}
             >
               <Icon
-                className={`w-4.5 h-4.5 flex-shrink-0 ${isActive ? "text-white" : "text-white/50 group-hover:text-white"}`}
+                className={`w-4.5 h-4.5 flex-shrink-0 ${
+                  isActive
+                    ? "text-white"
+                    : "text-white/50 group-hover:text-white"
+                }`}
               />
               <span className="flex-1 text-left">{item.label}</span>
-              {item.badge !== undefined && (
-                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
-                  {item.badge}
-                </span>
-              )}
               {isActive && (
                 <ChevronRight className="w-3.5 h-3.5 text-white/70" />
               )}
@@ -173,7 +167,11 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
               {user.name.split(" ").slice(0, 2).join(" ")}
             </p>
             <p className="text-white/40 text-xs capitalize truncate">
-              {user.role === "feeManager" ? "Fee Manager" : user.role}
+              {user.role === "superAdmin"
+                ? "Super Admin"
+                : user.role === "feeManager"
+                  ? "Fee Manager"
+                  : user.role}
             </p>
           </div>
         </div>
