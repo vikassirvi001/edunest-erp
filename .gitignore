@@ -1,0 +1,15 @@
+# Build artifacts (added by VrittOS dev agent)
+node_modules/
+dist/
+coverage/
+.angular/
+bin/
+obj/
+out/
+target/
+build/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+*.user
