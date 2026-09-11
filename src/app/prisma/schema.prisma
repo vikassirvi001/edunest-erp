@@ -12,6 +12,17 @@ enum Role {
   editor
 }
 
+enum PurchaseProvider {
+  razorpay
+  stripe
+}
+
+enum PurchaseStatus {
+  pending
+  paid
+  failed
+}
+
 model User {
   id           String    @id @default(cuid())
   name         String
@@ -53,6 +64,7 @@ model Article {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   pdfAssets           PdfAsset[]
+  premiumPurchases    PremiumPurchase[]
 
   @@index([categoryId])
   @@index([authorId])
@@ -80,4 +92,22 @@ model AdSlot {
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+// Anonymous ad-free PDF purchase. Intentionally has NO relation to User —
+// purchases are keyed solely by the payment provider's session id, so a
+// reader never needs an account to buy the watermark-free PDF.
+model PremiumPurchase {
+  id                     String            @id @default(cuid())
+  articleId              String
+  article                Article           @relation(fields: [articleId], references: [id])
+  provider               PurchaseProvider
+  providerSessionId      String            @unique
+  amount                 Int
+  status                 PurchaseStatus    @default(pending)
+  unwatermarkedLinkToken String?           @unique
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  @@index([articleId])
 }
